@@ -1,4 +1,4 @@
-import { Admin } from "@app/common/auth/user.decorator"
+import { Admin, Public } from "@app/common/auth/user.decorator"
 import { cinemaListResponseSchema, cinemaSchema } from "@app/common/schemas/cinema/schema"
 import { CinemaType } from "@app/common/schemas/cinema/types"
 import {
@@ -13,6 +13,7 @@ import {
   Put,
 } from "@nestjs/common"
 import { ApiOkResponse } from "@nestjs/swagger"
+import { HealthCheck, HealthCheckService } from "@nestjs/terminus"
 import { zodToOpenAPI } from "nestjs-zod"
 
 import { CinemaService } from "./cinema.service"
@@ -25,7 +26,17 @@ import { UpdateSceanceDto } from "./dto/update-sceance.dto"
 
 @Controller("cinema")
 export class CinemaController {
-  constructor(private readonly cinemaService: CinemaService) {}
+  constructor(
+    private readonly cinemaService: CinemaService,
+    private readonly health: HealthCheckService,
+  ) {}
+
+  @Public()
+  @Get("health")
+  @HealthCheck()
+  check() {
+    return this.health.check([])
+  }
 
   // Cinema
   @Get()
