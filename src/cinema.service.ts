@@ -1,4 +1,4 @@
-import { PrismaService } from "@app/common"
+import { MailService, PrismaService } from "@app/common"
 import {
   CinemaCreateType,
   CinemaType,
@@ -12,7 +12,10 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 
 @Injectable()
 export class CinemaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   async create(data: CinemaCreateType): Promise<CinemaType> {
     return this.prisma.cinema.create({ data })
@@ -68,14 +71,31 @@ export class CinemaService {
   }
 
   async createSceance(cinemaUid: string, roomUid: string, data: SceanceCreateType) {
-    await this.findOne(cinemaUid) // Check if cinema exists
+    const cinema = await this.findOne(cinemaUid) // Check if cinema exists
 
-    return this.prisma.sceance
+    const movie = await this.prisma.movie.findUnique({ where: { uid: data.movie } })
+    const sceance = await this.prisma.sceance
       .create({ data: { date: data.date, movieUid: data.movie, roomUid } })
       .catch(e => {
         if (e.meta?.field_name?.includes("movieUid")) throw new NotFoundException("Movie not found")
         throw new NotFoundException("Room not found")
       })
+
+    const emails = await this.prisma.user
+      .findMany({ select: { email: true } })
+      .then(users => users.map(u => u.email))
+    await this.mailService.sendEmail(
+      emails,
+      `New sceance for ${movie?.name}`,
+      `
+<h1>New sceance for ${movie?.name}</h1>
+<p>A new sceance for ${movie?.name} has been added to ${cinema.name}.</p>
+<p>Date: ${sceance.date.toISOString()}</p>
+<p>Thank you for using our service.</p>
+    `,
+    )
+
+    return sceance
   }
   async getSceances(cinemaUid: string, roomUid: string) {
     await this.findOne(cinemaUid) // Check if cinema exists
